@@ -1,0 +1,45 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Models and voice files (multi-GB, never commit)
+*.gguf
+*.safetensors
+*.bin
+*.onnx
+*.onnx.json
+*.pt
+models/
+voices/
+
+# Local data
+*.db
+*.sqlite
+*.sqlite3
+data/
+logs/
+*.log
+
+# Sandboxed code execution workspace
+sandbox/
+workspace/
+
+# Node (if you add a build step later)
+node_modules/
+dist/
+
+# OS and editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
