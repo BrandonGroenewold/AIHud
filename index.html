@@ -355,7 +355,9 @@
     claude:    { gpu: 9,  temp: 56, cpu: 18, ctx: 5.4, tps: 78 }
   };
   const NOISE = { gpu: 3, temp: .15, cpu: 2, ctx: .01, tps: 3 };
+    const LIVE = { on: false };
   function stepMetrics(dt) {
+    if (LIVE.on) return;
     const T = TGT[(state === 'thinking' && brain === 'claude') ? 'claude' : state];
     for (const k in T) M[k] += (T[k] - M[k]) * Math.min(1, dt * 1.4) + (Math.random() - .5) * NOISE[k] * (T[k] > 1 ? 1 : .2);
     M.gpu = clamp(M.gpu, 1, 100); M.tps = Math.max(0, M.tps); M.cpu = clamp(M.cpu, 1, 100);
@@ -598,6 +600,41 @@
     clearTimeout(densTimer); densTimer = setTimeout(() => { buildShell(); if (reduce) draw(0, 0); }, 80);
   });
 
+  /* ---------- live link (WebSocket) ---------- */
+  const WS_URL = new URLSearchParams(location.search).get('ws') || 'ws://localhost:8000/ws/hud';
+  let ws, retryTimer;
+  function stopDemo() { auto = false; runId++; mark(''); }
+  function onMsg(m) {
+    switch (m.type) {
+      case 'state':
+        if (!PRE[m.value]) break;
+        if (m.value === 'listening') { $('youTxt').textContent = ''; $('jvTxt').textContent = ''; }
+        setState(m.value, m.brain === 'claude' ? 'claude' : 'local');
+        break;
+      case 'transcript':
+        if (m.role === 'you') $('youTxt').textContent = '\u201C' + m.text + '\u201D';
+        else $('jvTxt').textContent = m.text;
+        break;
+      case 'reply': {
+        const el = $('jvTxt');
+        el.textContent = m.append ? el.textContent + m.text : m.text;
+        break;
+      }
+      case 'log': pushLog(m.label || 'Event', m.detail || ''); break;
+      case 'metrics':
+        for (const k of ['vram', 'ram', 'cpu', 'temp', 'ctx']) if (typeof m[k] === 'number') M[k] = m[k];
+        break;
+    }
+  }
+  function connect() {
+    try { ws = new WebSocket(WS_URL); } catch (e) { return; }
+    ws.onopen = () => { LIVE.on = true; stopDemo(); setState('idle'); pushLog('Link', 'backend connected'); };
+    ws.onmessage = e => { try { onMsg(JSON.parse(e.data)); } catch (_) {} };
+    ws.onclose = () => { LIVE.on = false; clearTimeout(retryTimer); retryTimer = setTimeout(connect, 3000); };
+    ws.onerror = () => ws.close();
+  }
+  connect();
+
   /* ---------- sizing ---------- */
   function resize() {
     DPR = Math.min(window.devicePixelRatio || 1, 2);
@@ -633,7 +670,7 @@
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  setTimeout(() => demo(runId), 2600);
+    setTimeout(() => { if (!LIVE.on) demo(runId); }, 2600);
 })();
 </script>
 </body>
