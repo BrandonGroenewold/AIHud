@@ -32,7 +32,7 @@
   #br { right:36px; bottom:52px; width:236px; }
   #leds { margin-top:6px; white-space:nowrap; }
 
-  #tx { left:50%; transform:translateX(-50%); bottom:106px; width:min(640px,92vw); text-align:center; font-size:14px; line-height:1.5; min-height:60px; }
+  #tx { left:50%; transform:translateX(-50%); bottom:150px; width:min(640px,92vw); text-align:center; font-size:14px; line-height:1.5; min-height:60px; }
   #youTxt { color:rgba(var(--rgb),.7); }
   #jvTxt { color:#eafffb; }
 
@@ -46,8 +46,16 @@
   #ctl label { display:flex; align-items:center; gap:8px; }
   #ctl input { accent-color:rgb(var(--rgb)); width:110px; }
 
+    #chat { flex-basis:100%; display:flex; margin-bottom:4px; }
+  #chatIn { flex:1; font:inherit; font-size:13px; letter-spacing:.04em; color:#eafffb;
+    background:rgba(var(--rgb),.06); border:1px solid rgba(var(--rgb),.4); border-radius:999px;
+    padding:6px 16px; outline:none; }
+  #chatIn::placeholder { color:rgba(var(--rgb),.45); }
+  #chatIn:focus { border-color:rgba(var(--rgb),.9); background:rgba(var(--rgb),.12); }
+  #chatIn:disabled { opacity:.5; }
+
   @media (max-width:900px) { #bl, #br { display:none; } }
-  @media (max-width:640px) { #tl .dim, #tr .dim { display:none; } .big { font-size:22px; } #tl { left:24px; } #tr { right:24px; } #tx { bottom:120px; } }
+  @media (max-width:640px) { #tl .dim, #tr .dim { display:none; } .big { font-size:22px; } #tl { left:24px; } #tr { right:24px; }   @media (max-width:900px) { #bl, #br { display:none; } } }
 </style>
 </head>
 <body>
@@ -82,6 +90,7 @@
 </div>
 
 <div id="ctl">
+  <div id="chat"><input id="chatIn" type="text" autocomplete="off" placeholder="Type a message and press Enter" aria-label="Message"></div>
   <button data-s="auto" class="on">Auto demo</button>
   <button data-s="idle">Idle</button>
   <button data-s="listening">Listening</button>
@@ -612,7 +621,7 @@
         setState(m.value, m.brain === 'claude' ? 'claude' : 'local');
         break;
       case 'transcript':
-        if (m.role === 'you') $('youTxt').textContent = '\u201C' + m.text + '\u201D';
+        if (m.role === 'you') { $('youTxt').textContent = '\u201C' + m.text + '\u201D'; $('jvTxt').textContent = ''; }
         else $('jvTxt').textContent = m.text;
         break;
       case 'reply': {
@@ -634,6 +643,29 @@
     ws.onerror = () => ws.close();
   }
   connect();
+
+  /* ---------- chat box ---------- */
+  const API_URL = 'http://localhost:8000/chat';
+  const chatIn = $('chatIn');
+  let sending = false;
+  chatIn.addEventListener('keydown', async e => {
+    if (e.key !== 'Enter' || sending) return;
+    const text = chatIn.value.trim();
+    if (!text) return;
+    if (!LIVE.on) { pushLog('Chat', 'backend not connected'); return; }
+    sending = true; chatIn.value = ''; chatIn.disabled = true;
+    try {
+      const r = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      if (!r.ok) pushLog('Chat', 'error ' + r.status);
+    } catch (err) {
+      pushLog('Chat', 'request failed');
+    }
+    sending = false; chatIn.disabled = false; chatIn.focus();
+  });
 
   /* ---------- sizing ---------- */
   function resize() {
